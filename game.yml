@@ -31,13 +31,20 @@ mode:
 # Hysteria2 endpoints the app injects as proxies.
 # IMPORTANT: NO `password` here — it is per-user and the app fills it from the
 # user's vlessUuid, already present in the subscription's vless proxies. On
-# Remnawave 2.7.4 the Hy2 auth == vlessUuid (verified e2e). Add more nodes
-# (closer to game datacenters) for lower ping / future multipath.
+# Remnawave 2.7.4 the Hy2 auth == vlessUuid (verified e2e).
+#
+# USE THE REGION POOL DOMAIN ({cc}.meybz.asia), NOT a node domain. A node is a
+# cattle — if pl-001 dies, `pl-001.meybz.asia` points at a corpse; the pool
+# `pl.meybz.asia` resolves across ALL live PL nodes and drops dead ones.
+# `sni` must equal `server` and the node's LE cert must SAN the pool domain —
+# the certbot role already issues a SAN for both node + pool domain
+# (verified: pl-001 cert SAN = pl-001.meybz.asia, pl.meybz.asia).
+# Add region pools near game datacenters for lower ping / future multipath.
 hysteria:
   - name: "🎮 PL"
-    server: pl-001.meybz.asia
+    server: pl.meybz.asia
     port: 443
-    sni: pl-001.meybz.asia
+    sni: pl.meybz.asia
     alpn: ["h3"]
     skip-cert-verify: false
 

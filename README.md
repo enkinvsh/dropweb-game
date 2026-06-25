@@ -70,6 +70,19 @@ subscription's `vless` proxies. On Remnawave **2.7.4** the Hysteria2 client auth
 **equals the user's vlessUuid** (verified end-to-end). So injection needs zero
 extra credential plumbing.
 
+### Use pool domains, not node domains (node = cattle)
+
+Hy2 `server`/`sni` must be the **region pool domain** (`{cc}.meybz.asia`, e.g.
+`pl.meybz.asia`) — never a single node (`pl-001.meybz.asia`). A node is
+disposable: when its IP dies the node domain points at a corpse, but the pool
+resolves across all live region nodes and drops dead ones automatically.
+
+Because Hy2 uses a **real LE certificate** (unlike Reality, which borrows via
+`serverNames`), the cert MUST cover the pool domain. The webpanel `certbot` role
+already issues a SAN for both the node and pool domains (verified: `pl-001` cert
+SAN = `pl-001.meybz.asia, pl.meybz.asia`), so `sni: pl.meybz.asia` validates out
+of the box.
+
 ### Routing gotcha (for the app implementer)
 
 The rules are applied as **rules** (`RULE-SET … → 🎮 Gaming`). Do **NOT** use
@@ -82,8 +95,9 @@ gaming WorkMode so other modes are untouched.
 
 ## Operations
 
-- **Add / swap Hy2 nodes** (e.g. ones near game datacenters): edit `hysteria[]`,
-  push. All clients pick it up on next subscription/config refresh.
+- **Add / swap Hy2 region pools** (e.g. ones near game datacenters): edit
+  `hysteria[]` with `{cc}.meybz.asia` pool domains, push. Clients pick it up on
+  next refresh. Adding a node to a region's pool is transparent to `game.yml`.
 - **Tune the game list**: edit `rules[]` / `rule-providers` (game domains come
   from [legiz-ru/mihomo-rule-sets](https://github.com/legiz-ru/mihomo-rule-sets)
   `other/games-direct.yaml` + mihomo `GEOSITE` categories).
