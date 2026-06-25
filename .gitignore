@@ -1,0 +1,6 @@
+.DS_Store
+.omo/
+.sisyphus/
+.serena/
+.code-graph/
+*.log

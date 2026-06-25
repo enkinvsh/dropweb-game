@@ -1,0 +1,74 @@
+# dropweb-game — "Игровой" (Gaming) mode descriptor for the dropweb VPN app.
+#
+# WHAT THIS IS
+#   One declarative file that turns on and configures the app's third routing
+#   mode — "Игровой". The panel advertises it per-subscription via a custom
+#   HTTP response header:
+#
+#       dropweb-game: https://raw.githubusercontent.com/enkinvsh/dropweb-game/main/game.yml
+#
+#   When the app sees that header it (1) reveals "Игровой" in the UI, (2) fetches
+#   THIS file, (3) applies the patch below to the active Mihomo config. No app
+#   release is needed to change behaviour — edit + push here, clients pick it up.
+#
+# ROUTING INTENT
+#   Games + gaming-adjacent services (Discord / Twitch / YouTube) → VPN via a
+#   low-latency Hysteria2 tunnel. Everything else → DIRECT (minimal ping; RU /
+#   local traffic never detours).
+#
+# See README.md for the full schema, header setup, and operations.
+
+version: 1
+
+mode:
+  id: gaming
+  name: "Игровой"
+  icon: gamepad
+  # First app version that ships gaming-mode support. The app hides the mode
+  # if it is older than this (forward-safe rollout). Bump to the real release.
+  minAppVersion: "0.8.2"
+
+# Hysteria2 endpoints the app injects as proxies.
+# IMPORTANT: NO `password` here — it is per-user and the app fills it from the
+# user's vlessUuid, already present in the subscription's vless proxies. On
+# Remnawave 2.7.4 the Hy2 auth == vlessUuid (verified e2e). Add more nodes
+# (closer to game datacenters) for lower ping / future multipath.
+hysteria:
+  - name: "🎮 PL"
+    server: pl-001.meybz.asia
+    port: 443
+    sni: pl-001.meybz.asia
+    alpn: ["h3"]
+    skip-cert-verify: false
+
+# The proxy-group gaming traffic routes to. Members = the injected Hy2 proxies.
+# url-test = lowest-latency node (room for load-balance / multipath later).
+group:
+  name: "🎮 Gaming"
+  type: url-test
+  url: "https://cp.cloudflare.com/generate_204"
+  interval: 60
+  tolerance: 50
+
+# Remote rule-set(s) the app registers before applying the rules below.
+rule-providers:
+  dropweb-games:
+    type: http
+    behavior: classical
+    format: yaml
+    url: "https://raw.githubusercontent.com/legiz-ru/mihomo-rule-sets/main/other/games-direct.yaml"
+    interval: 86400
+
+# Routing applied ONLY in gaming mode. The app REPLACES the active rules with
+# these (strictly gated to WorkMode.gaming; never touches other modes). Targets
+# resolve to `group.name`. Ends with MATCH,DIRECT — anything unmatched stays
+# direct. NB: applied as RULES — do NOT rely on mihomo `mode: global` (global
+# ignores custom groups and falls back to DIRECT).
+rules:
+  - "GEOSITE,category-games,🎮 Gaming"
+  - "GEOSITE,category-game-accelerator-cn,🎮 Gaming"
+  - "RULE-SET,dropweb-games,🎮 Gaming"
+  - "GEOSITE,discord,🎮 Gaming"
+  - "GEOSITE,twitch,🎮 Gaming"
+  - "GEOSITE,youtube,🎮 Gaming"
+  - "MATCH,DIRECT"
