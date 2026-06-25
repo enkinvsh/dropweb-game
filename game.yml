@@ -78,6 +78,8 @@ rules:
   - "PROCESS-NAME,cs2,🎮 Gaming"
   - "PROCESS-NAME,dota2.exe,🎮 Gaming"
   - "PROCESS-NAME,dota2,🎮 Gaming"
+  - "PROCESS-NAME,r5apex.exe,🎮 Gaming"
+  - "PROCESS-NAME,r5apex_dx12.exe,🎮 Gaming"
   - "GEOSITE,category-games,🎮 Gaming"
   - "GEOSITE,category-game-accelerator-cn,🎮 Gaming"
   - "RULE-SET,dropweb-games,🎮 Gaming"
