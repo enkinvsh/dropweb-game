@@ -28,23 +28,20 @@ mode:
   # if it is older than this (forward-safe rollout). Bump to the real release.
   minAppVersion: "0.8.2"
 
-# Hysteria2 endpoints the app injects as proxies.
-# IMPORTANT: NO `password` here — it is per-user and the app fills it from the
-# user's vlessUuid, already present in the subscription's vless proxies. On
-# Remnawave 2.7.4 the Hy2 auth == vlessUuid (verified e2e).
+# Hy2 proxy TEMPLATE — GENERIC params only. The actual node domains are NOT in
+# this (public-safe) file. They arrive from the panel header `dropweb-game-nodes`
+# (comma-separated region POOL domains, e.g. "pl.meybz.asia,de.meybz.asia"), so
+# nothing about the infra is ever committed to this repo.
 #
-# USE THE REGION POOL DOMAIN ({cc}.meybz.asia), NOT a node domain. A node is a
-# cattle — if pl-001 dies, `pl-001.meybz.asia` points at a corpse; the pool
-# `pl.meybz.asia` resolves across ALL live PL nodes and drops dead ones.
-# `sni` must equal `server` and the node's LE cert must SAN the pool domain —
-# the certbot role already issues a SAN for both node + pool domain
-# (verified: pl-001 cert SAN = pl-001.meybz.asia, pl.meybz.asia).
-# Add region pools near game datacenters for lower ping / future multipath.
+# For each domain D in `dropweb-game-nodes` the app builds a proxy:
+#   { name: "🎮 "+D, type: hysteria2, server: D, sni: D,
+#     password: <user's vlessUuid, app-filled>, port, alpn, skip-cert-verify }
+# Hy2 auth == vlessUuid on Remnawave 2.7.4 (verified e2e). Hy2 uses a real LE
+# cert, so each node's cert must SAN its pool domain — the certbot role already
+# does (verified: pl-001 SAN = pl-001.meybz.asia, pl.meybz.asia).
 hysteria:
-  - name: "🎮 PL"
-    server: pl.meybz.asia
+  template:
     port: 443
-    sni: pl.meybz.asia
     alpn: ["h3"]
     skip-cert-verify: false
 

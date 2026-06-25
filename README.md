@@ -2,49 +2,58 @@
 
 Remote descriptor for the **«Игровой» (Gaming)** routing mode of the **dropweb** VPN app.
 
-This repo hosts a single file — [`game.yml`](./game.yml) — that the dropweb app
-fetches and applies to turn on a gaming-optimized routing mode: **games +
-gaming-adjacent services → VPN (via a low-latency Hysteria2 tunnel), everything
-else → DIRECT**. Behaviour is changed by editing this file, **without an app
-release**.
+[`game.yml`](./game.yml) is a **generic, infra-free** routing descriptor: it
+defines the gaming mode, the `🎮 Gaming` group, the games rule-set and the
+routing rules — **games + gaming-adjacent services → VPN (low-latency
+Hysteria2), everything else → DIRECT**. The actual **node pool lives only in a
+panel header**, never in this repo — so `game.yml` is safe to keep public and
+exposes nothing about the infrastructure.
 
 ---
 
-## How it works (header-driven, zero hardcode)
+## Two headers (infra stays server-side)
+
+The panel sets **two** subscription response headers (auto-collected by the app's
+existing `dropweb-*` sweep):
+
+| Header | Holds | Where it lives |
+|---|---|---|
+| `dropweb-game` | URL of this `game.yml` (generic rules/mode) | public (this repo) |
+| `dropweb-game-nodes` | the Hy2 pool, comma-separated region domains | **panel only** (never committed) |
+
+So nothing about your nodes is in any repo. Change the pool → edit the header in
+the panel. Change the rules/game-list → edit `game.yml`. Neither needs an app
+release.
 
 ```
-Panel (Remnawave)                 dropweb app
-─────────────────                 ───────────
-Subscription response header  ──▶ reads `dropweb-game` header
-  dropweb-game: <raw game.yml>      │
-                                    ├─ header present? → show "Игровой" mode
-                                    ├─ fetch game.yml (this repo)
-                                    └─ apply patch to the Mihomo config:
-                                         • inject Hysteria2 proxies (password = vlessUuid)
-                                         • create the "🎮 Gaming" group
-                                         • replace rules: games → group, rest → DIRECT
+Panel (Remnawave)                          dropweb app
+─────────────────                          ───────────
+dropweb-game:       <url to game.yml>  ──▶ header present? → show "Игровой"
+dropweb-game-nodes: pl.meybz.asia,...      ├─ fetch game.yml (generic rules/mode)
+                                           ├─ build Hy2 proxies, one per node
+                                           │    in dropweb-game-nodes
+                                           │    (password = user's vlessUuid)
+                                           ├─ create "🎮 Gaming" group (members = those)
+                                           └─ apply rules: games → group, rest → DIRECT
 ```
-
-The provider controls rollout entirely from the panel: **add the header → the
-mode appears; remove it → the mode disappears.** Per-subscription or global.
 
 ---
 
-## Panel setup (the header)
+## Panel setup
 
 Remnawave panel → **Subscription Settings → Custom Response Headers** → add:
 
 ```json
 {
-  "dropweb-game": "https://raw.githubusercontent.com/enkinvsh/dropweb-game/main/game.yml"
+  "dropweb-game":       "https://raw.githubusercontent.com/enkinvsh/dropweb-game/main/game.yml",
+  "dropweb-game-nodes": "pl.meybz.asia,de.meybz.asia"
 }
 ```
 
-Same mechanism as the existing `fallback-url` header. The app auto-collects any
-`dropweb-*` header (no whitelist), so no app change is needed to wire it.
-
-To **disable** the gaming mode for everyone: remove the header. To gate it to a
-subset of users: use the panel's per-squad / response-rules targeting.
+- `dropweb-game-nodes` = comma-separated **region POOL** domains (`{cc}.meybz.asia`).
+  Each becomes one Hy2 proxy. Add/remove pools here, not in `game.yml`.
+- **Disable** the mode: remove the headers. **Gate** to a subset: per-squad /
+  response-rules targeting in the panel.
 
 ---
 
@@ -53,74 +62,71 @@ subset of users: use the panel's per-squad / response-rules targeting.
 | Field | Meaning |
 |---|---|
 | `version` | Schema version. App rejects unknown majors. |
-| `mode.id` | Internal id (`gaming`). |
-| `mode.name` | UI label (`"Игровой"`). |
-| `mode.icon` | Icon hint; app maps it to its icon set. |
+| `mode.id` / `mode.name` / `mode.icon` | Mode id (`gaming`), UI label (`"Игровой"`), icon hint. |
 | `mode.minAppVersion` | App hides the mode if older (forward-safe rollout). |
-| `hysteria[]` | Hy2 endpoint templates the app injects as proxies. **No `password`** — see below. Fields: `name`, `server`, `port`, `sni`, `alpn`, `skip-cert-verify`. |
-| `group` | The proxy-group gaming traffic routes to. Members = injected Hy2 proxies. `url-test` picks the lowest-latency node. |
-| `rule-providers` | Remote rule-set(s) the app registers (e.g. game-domain lists). |
+| `hysteria.template` | **GENERIC** Hy2 proxy params only (`port`, `alpn`, `skip-cert-verify`). **No node domains.** The app builds one `hysteria2` proxy per domain from the **`dropweb-game-nodes`** header. |
+| `group` | The proxy-group gaming traffic routes to. Members = the built Hy2 proxies. `url-test` picks the lowest-latency node. |
+| `rule-providers` | Remote rule-set(s) the app registers (game-domain lists). |
 | `rules[]` | Routing applied **only** in gaming mode. App **replaces** the active rules with these. Targets resolve to `group.name`. Must end with `MATCH,DIRECT`. |
 
-### Per-user password (important)
+### Per-user password
 
-Hy2 endpoints carry **no password** in this file. The app fills each proxy's
-`password` from the **user's `vlessUuid`** — already present in the
-subscription's `vless` proxies. On Remnawave **2.7.4** the Hysteria2 client auth
-**equals the user's vlessUuid** (verified end-to-end). So injection needs zero
-extra credential plumbing.
+The built Hy2 proxies carry **no password** from this file or the header. The app
+fills each proxy's `password` from the **user's `vlessUuid`** — already present in
+the subscription's `vless` proxies. On Remnawave **2.7.4** the Hysteria2 client
+auth **equals the user's vlessUuid** (verified e2e). Zero extra credential
+plumbing — and no secret ever lives in `game.yml` or the header.
 
-### Use pool domains, not node domains (node = cattle)
+### Pool domains (node = cattle)
 
-Hy2 `server`/`sni` must be the **region pool domain** (`{cc}.meybz.asia`, e.g.
-`pl.meybz.asia`) — never a single node (`pl-001.meybz.asia`). A node is
-disposable: when its IP dies the node domain points at a corpse, but the pool
-resolves across all live region nodes and drops dead ones automatically.
+`dropweb-game-nodes` entries must be **region pool** domains (`{cc}.meybz.asia`,
+e.g. `pl.meybz.asia`) — never a single node (`pl-001.meybz.asia`). A node is
+disposable: when its IP dies the node domain points at a corpse; the pool
+resolves across all live region nodes and drops dead ones automatically. Adding a
+node to a region's pool is transparent — no header change needed.
 
-Because Hy2 uses a **real LE certificate** (unlike Reality, which borrows via
-`serverNames`), the cert MUST cover the pool domain. The webpanel `certbot` role
-already issues a SAN for both the node and pool domains (verified: `pl-001` cert
-SAN = `pl-001.meybz.asia, pl.meybz.asia`), so `sni: pl.meybz.asia` validates out
-of the box.
+Hy2 uses a **real LE cert** (unlike Reality, which borrows via `serverNames`), so
+each node's cert must SAN its pool domain — the webpanel `certbot` role already
+does (verified: `pl-001` SAN = `pl-001.meybz.asia, pl.meybz.asia`). `sni` =
+`server` = the pool domain validates out of the box.
 
 ### Routing gotcha (for the app implementer)
 
-The rules are applied as **rules** (`RULE-SET … → 🎮 Gaming`). Do **NOT** use
-mihomo `mode: global` to force traffic through the group — `global` ignores
-custom proxy-groups and falls back to `DIRECT`. Use `mode: rule` + the rules
-here (or the app's equivalent additive patch path), strictly gated to the
-gaming WorkMode so other modes are untouched.
+Apply the rules as **rules** (`RULE-SET … → 🎮 Gaming`). Do **NOT** use mihomo
+`mode: global` to force traffic through the group — `global` ignores custom
+proxy-groups and falls back to `DIRECT`. Use `mode: rule` + these rules (or the
+app's equivalent additive patch path), strictly gated to the gaming WorkMode so
+other modes are untouched.
 
 ---
 
 ## Operations
 
-- **Add / swap Hy2 region pools** (e.g. ones near game datacenters): edit
-  `hysteria[]` with `{cc}.meybz.asia` pool domains, push. Clients pick it up on
-  next refresh. Adding a node to a region's pool is transparent to `game.yml`.
-- **Tune the game list**: edit `rules[]` / `rule-providers` (game domains come
-  from [legiz-ru/mihomo-rule-sets](https://github.com/legiz-ru/mihomo-rule-sets)
-  `other/games-direct.yaml` + mihomo `GEOSITE` categories).
-- **Multipath (future)**: switch `group.type` to `load-balance` or add several
-  Hy2 nodes for redundancy/lower jitter (the ExitLag-style play).
-- **Rollback**: remove the `dropweb-game` header in the panel — the mode vanishes
-  instantly, no app release.
+- **Add / swap Hy2 region pools** (e.g. ones near game datacenters): edit the
+  `dropweb-game-nodes` **panel header** (not `game.yml`). Instant, per-sub or global.
+- **Tune the game list / routing**: edit `rules[]` / `rule-providers` here (game
+  domains from [legiz-ru/mihomo-rule-sets](https://github.com/legiz-ru/mihomo-rule-sets)
+  `other/games-direct.yaml` + mihomo `GEOSITE` categories), push.
+- **Multipath (future)**: switch `group.type` to `load-balance` or list several
+  pools in `dropweb-game-nodes` for redundancy/lower jitter (the ExitLag-style play).
+- **Rollback**: remove the headers in the panel — the mode vanishes instantly,
+  no app release.
 
 ## Security
 
-- The app **pins the source** to `raw.githubusercontent.com/enkinvsh/dropweb-game`
-  (this repo). It must reject `dropweb-game` headers pointing elsewhere.
-- `game.yml` may add **provider-owned** Hy2 proxies + rules/groups — never
-  arbitrary proxies from unpinned sources (would be a MITM vector).
-- Schema is validated; malformed files fall back to last-good cache.
+- **No secrets anywhere.** `game.yml` is generic (public-safe); the node pool is
+  in the panel header (server-side); the per-user password = vlessUuid the app
+  already holds. Nothing sensitive is committed or transmitted in the clear.
+- The app **pins the `game.yml` source** to
+  `raw.githubusercontent.com/enkinvsh/dropweb-game` and rejects `dropweb-game`
+  pointing elsewhere.
+- Node domains come from the **authed panel** (the operator's own, trusted)
+  header — never from the public `game.yml`.
+- Schema validated; malformed `game.yml` falls back to last-good cache.
 
 ---
 
-## Server side
+## Related
 
-The Hysteria2 inbound that these endpoints connect to is provisioned on the
-nodes by the webpanel Ansible repo. See its spec:
-`webpanel/docs/plans/2026-06-25-hysteria2-patch-playbook.md`
-(adds a Hy2 inbound coexisting with Reality on an existing exit node).
-
-App side: `dropweb-app/docs/plans/2026-06-25-gaming-mode.md`.
+- Server side (Hy2 inbound on nodes): `webpanel/docs/plans/2026-06-25-hysteria2-patch-playbook.md`.
+- App side (WorkMode.gaming, header parsing, injection): `dropweb-app/docs/plans/2026-06-25-gaming-mode.md`.
