@@ -29,7 +29,7 @@ release.
 Panel (Remnawave)                          dropweb app
 ─────────────────                          ───────────
 dropweb-game:       <url to game.yml>  ──▶ header present? → show "Игровой"
-dropweb-game-nodes: pl.meybz.asia,...      ├─ fetch game.yml (generic rules/mode)
+dropweb-game-nodes: pl.example.net,...      ├─ fetch game.yml (generic rules/mode)
                                            ├─ build Hy2 proxies, one per node
                                            │    in dropweb-game-nodes
                                            │    (password = user's vlessUuid)
@@ -46,11 +46,11 @@ Remnawave panel → **Subscription Settings → Custom Response Headers** → ad
 ```json
 {
   "dropweb-game":       "https://raw.githubusercontent.com/enkinvsh/dropweb-game/main/game.yml",
-  "dropweb-game-nodes": "pl.meybz.asia,de.meybz.asia"
+  "dropweb-game-nodes": "pl.example.net,de.example.net"
 }
 ```
 
-- `dropweb-game-nodes` = comma-separated **region POOL** domains (`{cc}.meybz.asia`).
+- `dropweb-game-nodes` = comma-separated **region POOL** domains (`{cc}.example.net`).
   Each becomes one Hy2 proxy. Add/remove pools here, not in `game.yml`.
 - **Disable** the mode: remove the headers. **Gate** to a subset: per-squad /
   response-rules targeting in the panel.
@@ -79,15 +79,15 @@ plumbing — and no secret ever lives in `game.yml` or the header.
 
 ### Pool domains (node = cattle)
 
-`dropweb-game-nodes` entries must be **region pool** domains (`{cc}.meybz.asia`,
-e.g. `pl.meybz.asia`) — never a single node (`pl-001.meybz.asia`). A node is
+`dropweb-game-nodes` entries must be **region pool** domains (`{cc}.example.net`,
+e.g. `pl.example.net`) — never a single node (`pl-001.example.net`). A node is
 disposable: when its IP dies the node domain points at a corpse; the pool
 resolves across all live region nodes and drops dead ones automatically. Adding a
 node to a region's pool is transparent — no header change needed.
 
 Hy2 uses a **real LE cert** (unlike Reality, which borrows via `serverNames`), so
 each node's cert must SAN its pool domain — the webpanel `certbot` role already
-does (verified: `pl-001` SAN = `pl-001.meybz.asia, pl.meybz.asia`). `sni` =
+does (verified on a real node). `sni` =
 `server` = the pool domain validates out of the box.
 
 ### Routing gotcha (for the app implementer)

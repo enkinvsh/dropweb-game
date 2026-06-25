@@ -30,7 +30,7 @@ mode:
 
 # Hy2 proxy TEMPLATE — GENERIC params only. The actual node domains are NOT in
 # this (public-safe) file. They arrive from the panel header `dropweb-game-nodes`
-# (comma-separated region POOL domains, e.g. "pl.meybz.asia,de.meybz.asia"), so
+# (comma-separated region POOL domains, e.g. "pl.example.net,de.example.net"), so
 # nothing about the infra is ever committed to this repo.
 #
 # For each domain D in `dropweb-game-nodes` the app builds a proxy:
@@ -38,7 +38,7 @@ mode:
 #     password: <user's vlessUuid, app-filled>, port, alpn, skip-cert-verify }
 # Hy2 auth == vlessUuid on Remnawave 2.7.4 (verified e2e). Hy2 uses a real LE
 # cert, so each node's cert must SAN its pool domain — the certbot role already
-# does (verified: pl-001 SAN = pl-001.meybz.asia, pl.meybz.asia).
+# does (verified on a real node).
 hysteria:
   template:
     port: 443
