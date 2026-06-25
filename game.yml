@@ -69,6 +69,15 @@ rule-providers:
 # direct. NB: applied as RULES — do NOT rely on mihomo `mode: global` (global
 # ignores custom groups and falls back to DIRECT).
 rules:
+  # Route the game PROCESS itself → Hy2. Steam Datagram Relay (CS2/Dota
+  # matchmaking + gameplay) is UDP to Valve relay IPs — IP-based, so the
+  # GEOSITE domain rules below do NOT catch it; without this it falls to
+  # MATCH,DIRECT and breaks behind the tun. PROCESS-NAME is desktop-only
+  # (OS-specific, device-local): cs2.exe=Windows, cs2=macOS/Linux.
+  - "PROCESS-NAME,cs2.exe,🎮 Gaming"
+  - "PROCESS-NAME,cs2,🎮 Gaming"
+  - "PROCESS-NAME,dota2.exe,🎮 Gaming"
+  - "PROCESS-NAME,dota2,🎮 Gaming"
   - "GEOSITE,category-games,🎮 Gaming"
   - "GEOSITE,category-game-accelerator-cn,🎮 Gaming"
   - "RULE-SET,dropweb-games,🎮 Gaming"
